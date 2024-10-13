@@ -9,7 +9,7 @@ pygame.init()
 # Set up display
 screen_width, screen_height = 800, 600
 screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Code Jumpers")
+pygame.display.set_caption("Jet Set Brian")
 
 # Define colors
 WHITE = (255, 255, 255)
@@ -23,6 +23,7 @@ ORANGE = (255, 165, 0)
 # Define fonts
 font = pygame.font.Font(None, 74)
 hello_world_font = pygame.font.Font(None, 150)  # Larger font for "Hello World!"
+game_over_font = pygame.font.Font(None, 100)
 
 # Define character properties
 character_size = 50
@@ -41,6 +42,7 @@ total_collectibles = 4
 all_collectibles_collected = False
 fade_alpha = 0  # Alpha value for the fade effect
 fade_complete = False  # Flag to track if the fade is done
+game_over = False  # Track if the game is over
 message_displayed = False  # Track if "Hello World!" has been displayed
 
 # Ground level (where the character "lands")
@@ -85,7 +87,11 @@ maps = [
     },
     # Map 3: Left door (to Map 2), right door (to Map 4)
     {
-        "platforms": [pygame.Rect(200, 350, 200, 20), pygame.Rect(500, 250, 150, 20), pygame.Rect(150, 450, 150, 20)],
+        "platforms": [
+            pygame.Rect(200, 350, 200, 20),
+            pygame.Rect(500, 250, 150, 20),
+            pygame.Rect(150, 450, 150, 20),
+        ],
         "enemies": [
             {
                 "rect": pygame.Rect(500, 230, 30, 30),
@@ -99,7 +105,11 @@ maps = [
     },
     # Map 4: Only left door (leads to Map 3)
     {
-        "platforms": [pygame.Rect(300, 400, 200, 20), pygame.Rect(600, 200, 150, 20), pygame.Rect(150, 450, 150, 20)],
+        "platforms": [
+            pygame.Rect(300, 400, 200, 20),
+            pygame.Rect(600, 200, 150, 20),
+            pygame.Rect(150, 450, 150, 20),
+        ],
         "enemies": [
             {
                 "rect": pygame.Rect(350, 380, 30, 30),
@@ -118,11 +128,27 @@ current_map_index = 0
 character_x = screen_width // 2
 character_y = ground_level
 
+
 def reset_character():
-    """Resets the character's position when moving to a new map"""
+    """Resets the character's position to the starting point."""
     global character_x, character_y
     character_x = screen_width // 2
     character_y = ground_level
+
+
+def reset_game():
+    """Resets the entire game when restarting."""
+    global lives, score, current_map_index, game_over, all_collectibles_collected, fade_complete, fade_alpha, message_displayed, hello_world_displayed
+    lives = 3
+    score = 0
+    current_map_index = 0
+    game_over = False
+    all_collectibles_collected = False
+    fade_complete = False
+    fade_alpha = 0
+    message_displayed = False
+    hello_world_displayed = False
+    reset_character()
 
 
 def check_for_map_transition():
@@ -132,11 +158,62 @@ def check_for_map_transition():
 
     # If character moves through a gap, switch map
     if current_map["gaps"]["left"] and character_x < 0:
-        current_map_index = max(current_map_index - 1, 0)  # Move to previous map but don't go below 0
+        current_map_index = max(
+            current_map_index - 1, 0
+        )  # Move to previous map but don't go below 0
         reset_character()
     elif current_map["gaps"]["right"] and character_x + character_size > screen_width:
-        current_map_index = min(current_map_index + 1, len(maps) - 1)  # Move to next map but don't exceed max index
+        current_map_index = min(
+            current_map_index + 1, len(maps) - 1
+        )  # Move to next map but don't exceed max index
         reset_character()
+
+
+def display_game_over():
+    """Displays Game Over message and waits for any key to restart."""
+    print("Now running game over....")  # For debugging purposes
+    global game_over
+    screen.fill(BLACK)
+
+    # Render "GAME OVER" message
+    game_over_text = game_over_font.render("GAME OVER", True, RED)
+    screen.blit(
+        game_over_text,
+        (
+            screen_width // 2 - game_over_text.get_width() // 2,
+            screen_height // 2 - game_over_text.get_height() // 2,
+        ),
+    )
+
+    # Render "Press any key to restart"
+    restart_message = "Press any key to restart"
+    restart_message_surface = game_over_font.render(restart_message, True, RED)
+    screen.blit(
+        restart_message_surface,
+        (
+            screen_width // 2 - restart_message_surface.get_width() // 2,
+            screen_height // 2 + game_over_text.get_height() // 2 + 20,
+        ),
+    )
+
+    pygame.display.flip()  # Ensure the screen updates immediately
+    game_over = True  # Set the game_over flag to True
+
+
+def check_enemy_collisions(character_rect):
+    """Checks if the player collides with any enemies and handles life loss."""
+    global lives, game_over
+    current_map = maps[current_map_index]
+
+    # Check for collision with any enemy
+    for enemy in current_map["enemies"]:
+        if character_rect.colliderect(enemy["rect"]):
+            lives -= 1
+            reset_character()  # Reset character position after collision
+            if lives <= 0:
+                display_game_over()  # Display Game Over screen
+                game_over = True  # Set game over flag to True
+
 
 def draw_borders():
     """Draw the borders and orange doors (gaps) on the left or right sides only"""
@@ -144,22 +221,46 @@ def draw_borders():
     gaps = current_map["gaps"]
 
     # Draw the borders with no gaps at the top or bottom
-    pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, screen_width, border_thickness))  # Top border
-    pygame.draw.rect(screen, BLACK, pygame.Rect(0, screen_height - border_thickness, screen_width, border_thickness))  # Bottom border
+    pygame.draw.rect(
+        screen, BLACK, pygame.Rect(0, 0, screen_width, border_thickness)
+    )  # Top border
+    pygame.draw.rect(
+        screen,
+        BLACK,
+        pygame.Rect(
+            0, screen_height - border_thickness, screen_width, border_thickness
+        ),
+    )  # Bottom border
 
     # Draw the left border, leaving a gap if 'left' is True
     if not gaps["left"]:
-        pygame.draw.rect(screen, BLACK, pygame.Rect(0, 0, border_thickness, screen_height))  # Solid left border
+        pygame.draw.rect(
+            screen, BLACK, pygame.Rect(0, 0, border_thickness, screen_height)
+        )  # Solid left border
     else:
         # Draw an orange door on the left side
-        pygame.draw.rect(screen, ORANGE, pygame.Rect(0, screen_height, border_thickness, 100))  # Door on the left
+        pygame.draw.rect(
+            screen, ORANGE, pygame.Rect(0, screen_height, border_thickness, 100)
+        )  # Door on the left
 
     # Draw the right border, leaving a gap if 'right' is True
     if not gaps["right"]:
-        pygame.draw.rect(screen, BLACK, pygame.Rect(screen_width - border_thickness, 0, border_thickness, screen_height))  # Solid right border
+        pygame.draw.rect(
+            screen,
+            BLACK,
+            pygame.Rect(
+                screen_width - border_thickness, 0, border_thickness, screen_height
+            ),
+        )  # Solid right border
     else:
         # Draw an orange door on the right side
-        pygame.draw.rect(screen, ORANGE, pygame.Rect(screen_width - border_thickness, screen_height, border_thickness, 100))  # Door on the right
+        pygame.draw.rect(
+            screen,
+            ORANGE,
+            pygame.Rect(
+                screen_width - border_thickness, screen_height, border_thickness, 100
+            ),
+        )  # Door on the right
 
 
 def display_lives():
@@ -181,9 +282,13 @@ def handle_collectibles(character_rect):
     if len(current_map["collectibles"]) == 0 and total_collectibles == 0:
         all_collectibles_collected = True
     else:
-        for collectible in current_map["collectibles"][:]:  # Iterate over a copy of the list
+        for collectible in current_map["collectibles"][
+            :
+        ]:  # Iterate over a copy of the list
             if character_rect.colliderect(collectible):
-                current_map["collectibles"].remove(collectible)  # Remove the collected item
+                current_map["collectibles"].remove(
+                    collectible
+                )  # Remove the collected item
                 score += 10  # Add 10 points for each collectible
                 total_collectibles -= 1
 
@@ -202,12 +307,14 @@ def update_enemies():
             enemy["rect"].x = enemy["range"][0]  # Snap to range start to avoid jitter
             enemy["direction"] = 1  # Move right
         elif enemy_rect.x >= enemy["range"][1] - enemy_rect.width:
-            enemy["rect"].x = enemy["range"][1] - enemy_rect.width  # Snap to range end to avoid jitter
+            enemy["rect"].x = (
+                enemy["range"][1] - enemy_rect.width
+            )  # Snap to range end to avoid jitter
             enemy["direction"] = -1  # Move left
 
 
 def fade_to_black():
-    """ Fades the screen to black by gradually increasing a black surface's alpha """
+    """Fades the screen to black by gradually increasing a black surface's alpha"""
     global fade_alpha, fade_complete
     fade_surface = pygame.Surface((screen_width, screen_height))
     fade_surface.fill(BLACK)
@@ -221,12 +328,18 @@ def fade_to_black():
 
 
 def display_hello_world():
-    """ Displays 'Hello World!' in blocky 8-bit style """
+    """Displays 'Hello World!' in blocky 8-bit style"""
     global message_displayed
     screen.fill(BLACK)  # Fully black background after the fade
     message = "HELLO WORLD!"
     message_surface = hello_world_font.render(message, True, RED)
-    screen.blit(message_surface, (screen_width // 2 - message_surface.get_width() // 2, screen_height // 2 - message_surface.get_height() // 2))
+    screen.blit(
+        message_surface,
+        (
+            screen_width // 2 - message_surface.get_width() // 2,
+            screen_height // 2 - message_surface.get_height() // 2,
+        ),
+    )
     pygame.display.flip()
     message_displayed = True  # Set flag to avoid redrawing message continuously
 
@@ -239,15 +352,15 @@ while running:
             pygame.quit()
             sys.exit()
 
-    # If all collectibles are gathered, start the fade and display process
-    if score == 40 and not fade_complete:
-        fade_to_black()  # Gradually fade to black
-    elif fade_complete and not message_displayed:
-        display_hello_world()  # Show the "Hello World!" message after fade is done
+        # If game is over, press any key to reset the game
+        if game_over and event.type == pygame.KEYDOWN:
+            reset_game()
 
-    if all_collectibles_collected:
-        display_hello_world()  # Ensure "Hello World!" is displayed when all collectibles are gathered
-    else:
+    if game_over:
+        continue  # Skip further game logic if the game is over
+
+    # Movement logic, game mechanics, etc., only processed when game is not over
+    if not game_over:
         # Movement logic
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
@@ -263,7 +376,9 @@ while running:
         character_y += character_y_velocity
 
         # Check for landing on platforms
-        character_rect = pygame.Rect(character_x, character_y, character_size, character_size)
+        character_rect = pygame.Rect(
+            character_x, character_y, character_size, character_size
+        )
         on_platform = False
         current_map = maps[current_map_index]
         for platform in current_map["platforms"]:
@@ -288,6 +403,9 @@ while running:
         # Update enemies
         update_enemies()
 
+        # Check enemy collisions
+        check_enemy_collisions(character_rect)
+
         # Fill the screen with white
         screen.fill(WHITE)
 
@@ -298,14 +416,14 @@ while running:
         for platform in current_map["platforms"]:
             pygame.draw.rect(screen, GREEN, platform)
 
-        # Draw the character (a simple red rectangle for now)
+        # Draw the character
         pygame.draw.rect(screen, RED, character_rect)
 
-        # Draw the enemies (blue rectangles)
+        # Draw the enemies
         for enemy in current_map["enemies"]:
             pygame.draw.rect(screen, BLUE, enemy["rect"])
 
-        # Draw the collectibles (yellow rectangles)
+        # Draw the collectibles
         for collectible in current_map["collectibles"]:
             pygame.draw.rect(screen, YELLOW, collectible)
 
@@ -315,6 +433,10 @@ while running:
 
         # Update the display
         pygame.display.flip()
+
+    # If all collectibles are gathered, fade and display "Hello World!"
+    if all_collectibles_collected and not hello_world_displayed:
+        display_hello_world()
 
     # Set the frame rate
     pygame.time.Clock().tick(60)
