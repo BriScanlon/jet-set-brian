@@ -1,3 +1,5 @@
+# copyright 2024 Brian Scanlon
+
 import pygame
 import sys
 
