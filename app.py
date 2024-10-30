@@ -435,7 +435,7 @@ while running:
         pygame.display.flip()
 
     # If all collectibles are gathered, fade and display "Hello World!"
-    if all_collectibles_collected and not hello_world_displayed:
+    if all_collectibles_collected and not message_displayed:
         display_hello_world()
 
     # Set the frame rate
